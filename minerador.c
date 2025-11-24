@@ -26,8 +26,8 @@ typedef struct blocoMin
 /*protótipos*/
 void gerar_transacao(blocoNaoMin *bnm, unsigned int *carteira, MTRand *r);
 int verifica_carteira(unsigned int *carteira);
-void imprimir_bloco_detalhado(blocoNaoMin *bnm, unsigned char *hash);
-void imprimir_carteira_final(unsigned int *carteira);
+//void imprimir_bloco_detalhado(blocoNaoMin *bnm, unsigned char *hash);
+//void imprimir_carteira_final(unsigned int *carteira);
 
 int main()
 {
