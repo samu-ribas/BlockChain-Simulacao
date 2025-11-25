@@ -26,8 +26,8 @@ typedef struct blocoMin
 /*protótipos*/
 void gerar_transacao(blocoNaoMin *bnm, unsigned int *carteira, MTRand *r);
 int verifica_carteira(unsigned int *carteira);
-//void imprimir_bloco_detalhado(blocoNaoMin *bnm, unsigned char *hash);
-//void imprimir_carteira_final(unsigned int *carteira);
+void escrever_buffer_no_disco(blocoMin *buffer, int qtd, FILE *arqBin, FILE *arqTxt);
+void imprimir_carteira_final(unsigned int *carteira);
 
 int main()
 {
@@ -38,6 +38,18 @@ int main()
 	/*carteira de 256 usuários diferentes, identificados pelos endereços de 0 a 255*/
 	unsigned int carteira[256] = {0};
 	MTRand r = seedRand(1234567);
+
+	blocoMin buffer[16];  // O vetor que segura 16 blocos minerados
+    int pos_buffer = 0;   // Índice para saber em qual posição (0-15) 
+
+ 
+    FILE *arqBin = fopen("blockchain.bin", "wb");
+    FILE *arqTxt = fopen("blockchain.txt", "w");
+
+    if (arqBin == NULL || arqTxt == NULL) {
+        printf("Erro ao abrir arquivos!\n");
+        return 1;
+    }
 
 	/*BLOCO GÊNESIS*/
 	bnm.numero = 1;
@@ -57,7 +69,6 @@ int main()
 	for(int i = 0 ; i<SHA256_DIGEST_LENGTH ; i++)
 		bnm.hashAnterior[i] = 0;
 
-	printf("Minerando Bloco Gênesis...\n");
 	do{
 		SHA256((unsigned char *)&bnm, BLOCK_SIZE, hash);
 		if(hash[0]!=0)
@@ -66,10 +77,11 @@ int main()
 
 	carteira[minerador] += 50;
 
-	//imprimir_bloco_detalhado(&bnm, hash);
+	buffer[pos_buffer].bloco = bnm;
+    memcpy(buffer[pos_buffer].hash, hash, SHA256_DIGEST_LENGTH);
+    pos_buffer++;
 
 	memcpy(hashAnterior, hash, SHA256_DIGEST_LENGTH);
-
 
 	/*LOOP PRINCIPAL*/
 	unsigned char orig, dest, val;
@@ -104,13 +116,32 @@ int main()
 			carteira[orig] -= val;
 			carteira[dest] += val;
 		}
-		//imprimir_bloco_detalhado(&bnm, hash);
+
+		buffer[pos_buffer].bloco = bnm;
+        /* copia o hash válido para o buffer */
+        memcpy(buffer[pos_buffer].hash, hash, SHA256_DIGEST_LENGTH);
+        
+        pos_buffer++; // Avança para a próxima posição do buffer
+
+        /*se encheu 16 blocos, escreve no disco*/
+        if (pos_buffer == 16) {
+            escrever_buffer_no_disco(buffer, 16, arqBin, arqTxt);
+            pos_buffer = 0; // Reseta para começar a encher de novo
+        }
 
 		/*atualiza hash anterior para o pŕoximo loop*/
 		memcpy(hashAnterior, hash, SHA256_DIGEST_LENGTH);
+
 	}
 
-	//imprimir_carteira_final(carteira);
+	/* se sobrou algo no buffer que não completou 16, grava agora*/
+    if(pos_buffer > 0)
+        escrever_buffer_no_disco(buffer, pos_buffer, arqBin, arqTxt);
+  
+  	imprimir_carteira_final(carteira);
+    fclose(arqBin);
+    fclose(arqTxt);
+
 	return 0;
 }
 
@@ -180,51 +211,55 @@ int verifica_carteira(unsigned int *carteira){
 		if(carteira[i] > 0) return 1;
 	return 0;
 }
-/*
-void imprimir_bloco_detalhado(blocoNaoMin *bnm, unsigned char *hash){
-	printf("===============================================\n");
-	printf("BLOCO %d (Nonce: %u)\n", bnm->numero, bnm->nonce);
-	printf("Hash atual: ");
-	for(int i=0 ; i<SHA256_DIGEST_LENGTH ; i++)
-		printf("%02x", hash[i]);
-	printf("\n");
 
-	printf("Hash anterior: ");
-	for(int i=0 ; i<SHA256_DIGEST_LENGTH ; i++)
-		printf("%02x", bnm->hashAnterior[i]);
-	printf("\n");
-	printf("Minerador : %d\n", bnm->data[183]);
+void escrever_buffer_no_disco(blocoMin *buffer, int qtd, FILE *arqBin, FILE *arqTxt){
+    /*Escreve qtd blocos de uma vez só*/
+    fwrite(buffer, sizeof(blocoMin), qtd, arqBin);
+    unsigned char o, d, v;
+    /*escrita em Texto*/
+    for(int i = 0; i < qtd; i++){
+        fprintf(arqTxt, "BLOCO %u (Nonce: %u)\n", buffer[i].bloco.numero, buffer[i].bloco.nonce);
+        
+        fprintf(arqTxt, "Hash: ");
+        for(int j=0; j<32; j++)
+        	fprintf(arqTxt, "%02x", buffer[i].hash[j]);
+        fprintf(arqTxt, "\n");
 
-	/*se for gênesis imprime a string se não imprime transações*//*
-	if(bnm->numero == 1)
-		printf("Dados	: %s\n", bnm->data);
-	else{
-		printf("Transações:\n");
-		int tem_tx = 0;
-		for(int k=0 ; k<183; k+=3){
-			unsigned char o = bnm->data[k];
-            unsigned char d = bnm->data[k+1];
-            unsigned char v = bnm->data[k+2];
-            if(o == 0 && d == 0 && v == 0) break;
+        fprintf(arqTxt, "Hash Ant: ");
+        for(int j=0; j<32; j++)
+        	fprintf(arqTxt, "%02x", buffer[i].bloco.hashAnterior[j]);
+        fprintf(arqTxt, "\n");
+        
+        fprintf(arqTxt, "Minerador: %u\n", buffer[i].bloco.data[183]);
 
-            printf("   [Orig:%3d -> Dest:%3d | $:%3d]\n", o, d, v);
-            tem_tx = 1;
-		}
-		if(!tem_tx) printf("	(sem transações)\n");
-	}
-	printf("\n");
+        /*se for Gênesis, imprime string*/
+        if(buffer[i].bloco.numero == 1)
+             fprintf(arqTxt, "Dados: %s\n", buffer[i].bloco.data);
+        else
+        {
+            fprintf(arqTxt, "Transacoes:\n");
+            for(int k=0; k<183; k+=3){
+                o = buffer[i].bloco.data[k];
+                d = buffer[i].bloco.data[k+1];
+                v = buffer[i].bloco.data[k+2];
+                if(o==0 && d==0 && v==0) 
+                	break;
+                fprintf(arqTxt, "   %u -> %u : %u BTC\n", o, d, v);
+            }
+        }
+        /*separar os blocos*/
+        fprintf(arqTxt, "----------------------------------------------------------------\n");
+    }
 }
-*/
-/*
+
 void imprimir_carteira_final(unsigned int *carteira){
-	printf("\n=== SALDOS FINAIS (Enderecos > 0) ===\n");
+	printf("\nSALDOS FINAIS (Enderecos > 0)\n");
     unsigned long total_btc = 0;
-    for(int i = 0; i < 256; i++) {
-        if(carteira[i] > 0) {
+    for(int i = 0; i < 256; i++){
+        if(carteira[i] > 0){
             printf("Endereço %3d: %5u BTC\n", i, carteira[i]);
             total_btc += carteira[i];
         }
     }
     printf("Total em circulacao: %lu BTC (Deveria ser %d)\n", total_btc, NUM_BLOCK * 50);
 }
-*/
