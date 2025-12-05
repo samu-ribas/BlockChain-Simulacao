@@ -21,6 +21,7 @@ typedef struct blocoMin
 }blocoMin;
 
 void imprimir_bloco_completo(blocoMin *b);
+void buscar_bloco_f(FILE *arq);
 
 int main()
 {
@@ -119,4 +120,35 @@ void imprimir_bloco_completo(blocoMin *b){
             printf("Bloco vazio, sem transacoes\n");
     }
     printf("\n-------------------------------------------\n");
+}
+
+void buscar_bloco_f(FILE *arq){
+    unsigned int num;
+    blocoMin b;
+
+    printf("Digite o numero do bloco: ");
+    scanf("%u", &num);
+
+    if(num < 1){
+        printf("Numero invalido.\n");
+        return;
+    }
+
+    //cálculo do offset
+    long offset = (long)(num - 1) * sizeof(blocoMin);
+
+    //cabeça de leitura
+    if (fseek(arq, offset, SEEK_SET) != 0) {
+        printf("Erro: Bloco fora dos limites do arquivo.\n");
+        return;
+    }
+
+    // 2. Lê o bloco daquela posição
+    if (fread(&b, sizeof(blocoMin), 1, arq) != 1) {
+        printf("Erro de leitura ou bloco nao existe.\n");
+        return;
+    }
+
+    // 3. Imprime
+    imprimir_bloco_completo(&b);
 }
