@@ -4,6 +4,7 @@
 #include<stdlib.h>
 
 #define DATA_SIZE 184
+#define BLOCK_SIZE (sizeof(struct blocoNaoMin))
 
 typedef struct blocoNaoMin
 {
@@ -19,6 +20,7 @@ typedef struct blocoMin
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 }blocoMin;
 
+void imprimir_bloco_completo(blocoMin *b);
 
 int main()
 {
@@ -67,6 +69,7 @@ int main()
     
                 break;
             case 'x':
+            case 'x':
                 printf("Saindo...\n");
                 break;
             default:
@@ -75,4 +78,45 @@ int main()
     }while(opcao!='x');
     fclose(arqBin);
     return 0;
+}
+
+void imprimir_bloco_completo(blocoMin *b){
+    printf("\n-------------------------------------------\n");
+    printf("BLOCO %u\n", b->bloco.numero);
+    printf("Nonce: %u\n", b->bloco.nonce);
+    
+    printf("Hash: ");
+    for(int i=0; i<32; i++)
+        printf("%02x", b->hash[i]);
+    printf("\n");
+
+    printf("Hash anterior: ");
+    for(int i=0; i<32; i++)
+        printf("%02x", b->bloco.hashAnterior[i]);
+    printf("\n");
+
+    printf("Minerador: %u (Recebeu +50 BTC)\n", b->bloco.data[183]);
+
+    if (b->bloco.numero == 1)
+        printf("Dados: %s\n", b->bloco.data);
+    else{
+        printf("Transacoes:\n");
+
+        int tem_tx = 0;
+        unsigned char o, d, v; //origem, destino e valor
+        for(int k = 0; k < 183; k += 3) {
+            o = b->bloco.data[k];
+            d = b->bloco.data[k+1];
+            v = b->bloco.data[k+2];
+            //se encontrar 3 zeros para de ler 
+            if(o == 0 && d == 0 && v == 0)
+                break;
+            
+            printf("Origem:%3u -> Destino:%3u | Valor: %3u BTC]\n", o, d, v);
+            tem_tx = 1;
+        }
+        if(!tem_tx)
+            printf("Bloco vazio, sem transacoes\n");
+    }
+    printf("\n-------------------------------------------\n");
 }
