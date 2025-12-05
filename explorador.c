@@ -32,14 +32,15 @@ int main()
     FILE *arqBin = fopen("blockchain.bin", "rb");
 
     if(!arqBin){
-        perror("Não consegui abrir o arquivo\n")
+        perror("Não consegui abrir o arquivo\n");
         return 1;
     }
 
     do{
         printf("--------------MENU BLOCKCHAIN--------------\n");
         printf("a) Endereco com mais bitcoins\nb) Endereco que minerou mais blocos\nc) Hash do bloco com mais transações\nd) Hash do bloco com menos transações\ne) Quantidade media de bitcoins por bloco\nf) Imprimir bloco por numero\ng) Imprimir n primeiros blocos por endereco\nh) Imprimir n primeiros blocos\ni) Imprimir blocos por Nonce\nx) Sair\nEscolha uma opção: ");
-        scanf("%c", &opcao);
+        scanf(" %c", &opcao);
+
         switch (opcao)
         {
             case 'a':
@@ -64,7 +65,7 @@ int main()
                 break;
             case 'f':
             case 'F':
-            
+                buscar_bloco_f(arqBin);
                 break;
             case 'g':
             case 'G':
@@ -75,7 +76,7 @@ int main()
     
                 break;
             case 'x':
-            case 'x':
+            case 'X':
                 printf("Saindo...\n");
                 break;
             default:
@@ -134,6 +135,7 @@ void buscar_bloco_f(FILE *arq){
 
     printf("Digite o numero do bloco: ");
     scanf("%u", &num);
+
     if(num < 1){
         printf("Numero invalido.\n");
         return;
@@ -154,7 +156,7 @@ void buscar_bloco_f(FILE *arq){
     }
 
     /* le o registro inteiro daquela posição */
-    size_t lidos = fread(buffer_pagina, sizeof(blocoMin), FATOR_BLOCAGEM, arq);
+    size_t lidos = fread(buffer_pagina, sizeof(blocoMin), FATOR_BLOCO, arq);
     /*calcula o exato bloco que é para ser lido*/
     int indice_no_buffer = (num - 1) % FATOR_BLOCO;
 
