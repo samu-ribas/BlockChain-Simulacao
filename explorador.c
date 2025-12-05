@@ -3,11 +3,16 @@
 #include<openssl/sha.h>
 #include<stdlib.h>
 
+/* 61 transações x 3 bytes(origem, destino, valor) + 1 byte do minerador*/
 #define DATA_SIZE 184
 #define BLOCK_SIZE (sizeof(struct blocoNaoMin))
 /*le 4 blocos de uma vez*/
 #define FATOR_BLOCO 4
+/*definindo proximos numeros primos para tratar colisão*/
+#define TAM_HASH_NONCE 4099 
+#define TAM_HASH_ADRESS 256
 
+/*estruturas*/
 typedef struct blocoNaoMin
 {
     unsigned int numero;
@@ -22,23 +27,50 @@ typedef struct blocoMin
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 }blocoMin;
 
+/* nó da lista encadeada carrega em RAM*/
+typedef struct NoIndice{
+    unsigned int chave; /*guarda o endereço ou o nonce*/
+    unsigned int id_bloco;
+    struct NoIndice *prox;
+}NoIndice;
+
+/* Registro genérico */
+typedef struct{
+    unsigned char chave;
+    unsigned int id_bloco;
+}RegistroIndice;
+
 /*struct auxiliar para fazer a ordenação*/
 typedef struct{
     blocoMin b;
     int qtd;
 }BlocoOrdenavel;
 
+/*declarando globalmente as tabelas usadas*/
+NoIndice* tabela_endereco[TAM_HASH_ADRESS] = {NULL};
+NoIndice* tabela_nonce[TAM_HASH_NONCE] = {NULL}; 
 
+/*flags de controle*/
+int g_carregado = 0;
+int i_carregado = 0;
+
+/*funções auxiliares*/
 void imprimir_bloco_completo(blocoMin *b);
 int contar_transações(blocoMin *bloco);
 int transacoes_crescente(const void *a, const void *b);
+void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id);
+void carregar_indice(char tipo, FILE *arqBlockchain);
+
+/*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
 void buscar_bloco_f(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
+void consulta_g(FILE *arq);
 
+/*main e menu*/
 int main()
 {
     char opcao;
-    FILE *arqBin = fopen("blockchain.bin", "rb");
+    FILE *arqBin = fopen("blockchain.bin", "rb"); /*abrindo arq. bin. dos blocos*/
 
     if(!arqBin){
         perror("Não consegui abrir o arquivo\n");
@@ -84,7 +116,7 @@ int main()
 
             case 'g':
             case 'G':
-    
+                consulta_g(arqBin);
                 break;
 
             case 'h':
@@ -111,7 +143,7 @@ int main()
 }
 
 void imprimir_bloco_completo(blocoMin *b){
-    printf("\n-------------------------------------------\n");
+    printf("\n--------------------------------------------------------------------------------------\n");
     printf("BLOCO %u\n", b->bloco.numero);
     printf("Nonce: %u\n", b->bloco.nonce);
     
@@ -142,7 +174,7 @@ void imprimir_bloco_completo(blocoMin *b){
             if(o == 0 && d == 0 && v == 0)
                 break;
             
-            printf("Origem: %3u -> Destino: %3u | Valor: %3u BTC\n", o, d, v);
+            printf("\t\tOrigem: %3u -> Destino: %3u | Valor: %3u BTC\n", o, d, v);
             tem_transacao = 1;
         }
         if(!tem_transacao)
@@ -151,8 +183,7 @@ void imprimir_bloco_completo(blocoMin *b){
 }
 
 /*função auxiliar para contar transações*/
-int contar_transações(blocoMin *b)
-{
+int contar_transações(blocoMin *b){
     if(b->bloco.numero == 1)// bloco genêsis
         return 0;
 
@@ -177,6 +208,84 @@ int transacoes_crescente(const void *a, const void *b){
     BlocoOrdenavel *ba = (BlocoOrdenavel *)a;
     BlocoOrdenavel *bb = (BlocoOrdenavel *)b;
     return (ba->qtd - bb->qtd);
+}
+
+void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id){
+    int idx = chave % tamanho_tabela;
+    NoIndice *novo = NULL;
+    novo = (NoIndice *)malloc(sizeof(NoIndice));
+    if(!novo)
+        return;
+    novo->chave = chave;
+    novo->id_bloco = id;
+    novo->prox = tabela[idx];
+    tabela[idx] = novo;
+}
+
+void carregar_indice(char tipo, FILE *arqBlockchain){
+    /* Ponteiros auxiliares para configurar o comportamento da função*/
+    NoIndice **tabela;
+    int tamanho;
+    char *nome_arquivo;
+    int *flag_carregado;
+
+    /*baseada no tipo*/
+    if(tipo == 'G')
+    {
+        if(g_carregado)
+            return; /*já carregou*/
+        tabela = tabela_endereco;
+        tamanho = TAM_HASH_ADRESS;
+        nome_arquivo = "indice_minerador.bin";
+        flag_carregado = &g_carregado;
+    } 
+    else 
+    { 
+        if(i_carregado)
+            return;
+        tabela = tabela_nonce;
+        tamanho= TAM_HASH_NONCE;
+        nome_arquivo = "indice_nonce.bin";
+        flag_carregado = &i_carregado;
+    }
+
+    FILE *arqIndice = fopen(nome_arquivo, "rb");
+
+    /*arquivo existe, carregar do disco*/
+    if(arqIndice){
+        printf("Carregando indice %c do disco...\n", tipo);
+        RegistroIndice reg;
+        while(fread(&reg, sizeof(RegistroIndice), 1, arqIndice)){
+            insere_tabela(tabela, tamanho, reg.chave, reg.id_bloco);
+        }
+        fclose(arqIndice);
+    
+    } 
+    /*arquivo não existe, ler blockchain e criar*/
+    else{
+        printf("Criando indice %c a partir da blockchain...\n", tipo);
+        arqIndice = fopen(nome_arquivo, "wb");
+        
+        blocoMin b;
+        RegistroIndice reg;
+        
+        rewind(arqBlockchain);
+        while(fread(&b, sizeof(blocoMin), 1, arqBlockchain)){
+            /* decide ual campo extrair */
+            unsigned int chave_atual = (tipo == 'G') ? b.bloco.data[183] : b.bloco.nonce;
+            
+            insere_tabela(tabela, tamanho, chave_atual, b.bloco.numero);
+
+            /*gravar no disco*/
+            reg.chave = chave_atual;
+            reg.id_bloco = b.bloco.numero;
+            fwrite(&reg, sizeof(RegistroIndice), 1, arqIndice);
+        }
+        fclose(arqIndice);
+    }
+
+    *flag_carregado = 1; /*marca como pronto*/
+    printf("Indice %c pronto para uso\n", tipo);
 }
 
 /*função F*/
@@ -216,6 +325,56 @@ void buscar_bloco_f(FILE *arq){
         imprimir_bloco_completo(&buffer_pagina[indice_no_buffer]);
     else
         printf("Erro: Bloco %u não existe\n", num);
+}
+
+/*
+função G
+irá printar em ordem do bloco mais recente minerado pelo endereço 
+pela maneria que foi inserido na lista encadeada(no inicio)
+*/
+void consulta_g(FILE *arq){
+    /*parâmetro usados*/
+    int minerador_input, n;
+    
+    carregar_indice('G', arq);
+
+    /* entrada de dados */
+    printf("\nDigite o endereco do minerador (0-255): ");
+    scanf("%d", &minerador_input);
+    printf("Quantos blocos deseja ver: ");
+    scanf("%d", &n);
+
+    if(minerador_input < 0 || minerador_input > 255){
+        printf("Endereco invalido.\n");
+        return;
+    }
+
+    /* acesso direto à tabela Hash */
+    /* a chave é o próprio endereço */
+    NoIndice *atual = tabela_endereco[minerador_input];
+
+    if(!atual){
+        printf("Nenhum bloco encontrado para o minerador %d\n", minerador_input);
+        return;
+    }
+
+    blocoMin b;
+    int cont = 0;
+    /*varredura da lista encadeada*/
+    while(atual && cont < n){
+        unsigned int id = atual->id_bloco;
+        long offset = (long)(id - 1) * sizeof(blocoMin);
+        /*busca no disco*/
+        fseek(arq, offset, SEEK_SET);
+        if(fread(&b, sizeof(blocoMin), 1, arq) == 1){
+            imprimir_bloco_completo(&b);
+        }
+        atual = atual->prox;
+        cont++;
+    }
+    if(cont<n){
+        printf("\tFIM DA LISTA: encontrados apenas %d blocos\n", cont);
+    }
 }
 
 /*função H*/
