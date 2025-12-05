@@ -5,6 +5,9 @@
 
 #define DATA_SIZE 184
 #define BLOCK_SIZE (sizeof(struct blocoNaoMin))
+/*le 4 blocos de uma vez*/
+#define FATOR_BLOCO 4
+
 
 typedef struct blocoNaoMin
 {
@@ -25,12 +28,14 @@ void buscar_bloco_f(FILE *arq);
 
 int main()
 {
+    char opcao;
     FILE *arqBin = fopen("blockchain.bin", "rb");
+
     if(!arqBin){
-        printf("Erro ao abrir o arquivo\n");
+        perror("Não consegui abrir o arquivo\n")
         return 1;
     }
-    char opcao;
+
     do{
         printf("--------------MENU BLOCKCHAIN--------------\n");
         printf("a) Endereco com mais bitcoins\nb) Endereco que minerou mais blocos\nc) Hash do bloco com mais transações\nd) Hash do bloco com menos transações\ne) Quantidade media de bitcoins por bloco\nf) Imprimir bloco por numero\ng) Imprimir n primeiros blocos por endereco\nh) Imprimir n primeiros blocos\ni) Imprimir blocos por Nonce\nx) Sair\nEscolha uma opção: ");
@@ -124,31 +129,37 @@ void imprimir_bloco_completo(blocoMin *b){
 
 void buscar_bloco_f(FILE *arq){
     unsigned int num;
-    blocoMin b;
+    /*buffer na ram*/
+    blocoMin buffer_pagina[FATOR_BLOCO];
 
     printf("Digite o numero do bloco: ");
     scanf("%u", &num);
-
     if(num < 1){
         printf("Numero invalido.\n");
         return;
     }
 
-    //cálculo do offset
-    long offset = (long)(num - 1) * sizeof(blocoMin);
+    /*
+    para reduzir o número de acessos ao disco, vamos ler um pagina 
+    para a memória de uma vez
+    */
+    long pagina_id = (num - 1)/FATOR_BLOCO;/* ex: bloco 5. (5-1)/4 = pag. 1*/
 
-    //cabeça de leitura
-    if (fseek(arq, offset, SEEK_SET) != 0) {
+    long offset = pagina_id * FATOR_BLOCO * sizeof(blocoMin); /*num. da pag. * tam. da pag.*/
+
+    /* posiciona a cabeça de leitura, se retornar -1 significa que falhou*/
+    if(fseek(arq, offset, SEEK_SET) != 0){
         printf("Erro: Bloco fora dos limites do arquivo.\n");
         return;
     }
 
-    // 2. Lê o bloco daquela posição
-    if (fread(&b, sizeof(blocoMin), 1, arq) != 1) {
-        printf("Erro de leitura ou bloco nao existe.\n");
-        return;
-    }
+    /* le o registro inteiro daquela posição */
+    size_t lidos = fread(buffer_pagina, sizeof(blocoMin), FATOR_BLOCAGEM, arq);
+    /*calcula o exato bloco que é para ser lido*/
+    int indice_no_buffer = (num - 1) % FATOR_BLOCO;
 
-    // 3. Imprime
-    imprimir_bloco_completo(&b);
+    if(indice_no_buffer<lidos)
+        imprimir_bloco_completo(&buffer_pagina[indice_no_buffer]);
+    else
+        printf("Erro: Bloco %u não existe\n", num);
 }
