@@ -8,7 +8,6 @@
 /*le 4 blocos de uma vez*/
 #define FATOR_BLOCO 4
 
-
 typedef struct blocoNaoMin
 {
     unsigned int numero;
@@ -23,8 +22,18 @@ typedef struct blocoMin
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 }blocoMin;
 
+/*struct auxiliar para fazer a ordenação*/
+typedef struct{
+    blocoMin b;
+    int qtd;
+}BlocoOrdenavel;
+
+
 void imprimir_bloco_completo(blocoMin *b);
+int contar_transações(blocoMin *bloco);
+int transacoes_crescente(const void *a, const void *b);
 void buscar_bloco_f(FILE *arq);
+void imprimir_n_primeiro_ordenados(FILE *arq);
 
 int main()
 {
@@ -37,8 +46,8 @@ int main()
     }
 
     do{
-        printf("--------------MENU BLOCKCHAIN--------------\n");
-        printf("a) Endereco com mais bitcoins\nb) Endereco que minerou mais blocos\nc) Hash do bloco com mais transações\nd) Hash do bloco com menos transações\ne) Quantidade media de bitcoins por bloco\nf) Imprimir bloco por numero\ng) Imprimir n primeiros blocos por endereco\nh) Imprimir n primeiros blocos\ni) Imprimir blocos por Nonce\nx) Sair\nEscolha uma opção: ");
+        printf("\n--------------MENU BLOCKCHAIN--------------\n");
+        printf("a) Endereco com mais bitcoins\nb) Endereco que minerou mais blocos\nc) Hash do bloco com mais transações\nd) Hash do bloco com menos transações\ne) Quantidade media de bitcoins por bloco\nf) Imprimir bloco por numero\ng) Imprimir n primeiros blocos por endereco\nh) Imprimir n primeiros blocos ordenador por transações\ni) Imprimir blocos por Nonce\nx) Sair\nEscolha uma opção: ");
         scanf(" %c", &opcao);
 
         switch (opcao)
@@ -47,38 +56,52 @@ int main()
             case 'A':
                 
                 break;
+
             case 'b':
             case 'B':
                 
                 break;
+
             case 'c':
             case 'C':
                 
                 break;
+
             case 'd':
             case 'D':
                 
                 break;
+
             case 'e':
             case 'E':
             
                 break;
+
             case 'f':
             case 'F':
                 buscar_bloco_f(arqBin);
                 break;
+
             case 'g':
             case 'G':
-            
+    
                 break;
+
+            case 'h':
+            case 'H':
+                imprimir_n_primeiro_ordenados(arqBin);
+                break;
+
             case 'i':
             case 'I':
     
                 break;
+
             case 'x':
             case 'X':
                 printf("Saindo...\n");
                 break;
+
             default:
                 printf("Opção inválida!\n");
         }
@@ -109,7 +132,7 @@ void imprimir_bloco_completo(blocoMin *b){
     else{
         printf("Transacoes:\n");
 
-        int tem_tx = 0;
+        int tem_transacao = 0;
         unsigned char o, d, v; //origem, destino e valor
         for(int k = 0; k < 183; k += 3) {
             o = b->bloco.data[k];
@@ -119,15 +142,44 @@ void imprimir_bloco_completo(blocoMin *b){
             if(o == 0 && d == 0 && v == 0)
                 break;
             
-            printf("Origem:%3u -> Destino:%3u | Valor: %3u BTC]\n", o, d, v);
-            tem_tx = 1;
+            printf("Origem: %3u -> Destino: %3u | Valor: %3u BTC\n", o, d, v);
+            tem_transacao = 1;
         }
-        if(!tem_tx)
+        if(!tem_transacao)
             printf("Bloco vazio, sem transacoes\n");
     }
-    printf("\n-------------------------------------------\n");
 }
 
+/*função auxiliar para contar transações*/
+int contar_transações(blocoMin *b)
+{
+    if(b->bloco.numero == 1)// bloco genêsis
+        return 0;
+
+    int contador = 0;
+    unsigned char o, d, v;
+    for(int k = 0 ; k<183 ; k += 3){
+        o = b->bloco.data[k];
+        d = b->bloco.data[k+1];
+        v = b->bloco.data[k+2];
+        if(o == 0 && d == 0 && v == 0)
+            break;
+        contador++;
+    }
+    return contador;
+}
+
+/*
+função comparadora para o quick sort
+retorna <0 se a<b, 0 se a=b , >0 se a>b
+*/
+int transacoes_crescente(const void *a, const void *b){
+    BlocoOrdenavel *ba = (BlocoOrdenavel *)a;
+    BlocoOrdenavel *bb = (BlocoOrdenavel *)b;
+    return (ba->qtd - bb->qtd);
+}
+
+/*função F*/
 void buscar_bloco_f(FILE *arq){
     unsigned int num;
     /*buffer na ram*/
@@ -164,4 +216,40 @@ void buscar_bloco_f(FILE *arq){
         imprimir_bloco_completo(&buffer_pagina[indice_no_buffer]);
     else
         printf("Erro: Bloco %u não existe\n", num);
+}
+
+/*função H*/
+void imprimir_n_primeiro_ordenados(FILE *arq){
+    unsigned int n, lidos = 0;
+    printf("Digite a quantidade N de blocos para analisar: ");
+    scanf("%u", &n);
+
+    if(n < 0){
+        printf("Numero invalido.\n");
+        return;
+    }
+
+    BlocoOrdenavel *vetor = (BlocoOrdenavel *)malloc(n * sizeof(BlocoOrdenavel));
+    if(!vetor){
+        printf("Erro: Memória insuficiente na RAM.\n");
+        return;
+    }
+    /*reseta o cursor de leitura*/
+    rewind(arq);
+
+    for(int i = 0 ; i<n ; i++){
+        if(fread(&vetor[i].b, sizeof(blocoMin), 1, arq) != 1)
+            break; /*o arquivo acabou antes de chegar em N*/
+        /*faz calculo da contagem e guarda na struct*/
+        vetor[i].qtd = contar_transações(&vetor[i].b);
+        lidos++;
+    }
+    qsort(vetor, lidos, sizeof(BlocoOrdenavel), transacoes_crescente);
+
+    printf("---------PRIMEIROS %u BLOCOS ORDENADOS POR TRANSAÇÕES---------\n", lidos);
+    for(int i=0 ; i<lidos ; i++){
+        printf("\nQuantidade de transações: %d", vetor[i].qtd);
+        imprimir_bloco_completo(&vetor[i].b);
+    }
+    free(vetor);
 }
