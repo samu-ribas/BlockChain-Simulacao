@@ -77,6 +77,7 @@ void buscar_bloco_f(FILE *arq);
 void consulta_g(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
 void consulta_i(FILE *arq);
+void liberar_memoria_indices();
 
 /*main e menu*/
 int main()
@@ -222,7 +223,7 @@ int transacoes_crescente(const void *a, const void *b){
     return (ba->qtd - bb->qtd);
 }
 
-void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id){
+void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id,  char tipo){
     /*inserindo na hash como tratamento de colisao por encadeamento*/
     int idx = chave % tamanho_tabela;
     NoIndice *novo = NULL;
@@ -231,12 +232,29 @@ void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, un
         return;
     novo->chave = chave;
     novo->id_bloco = id;
-    novo->prox = tabela[idx];
-    tabela[idx] = novo;
+    novo->prox = NULL;
+    /*caso 1 lista vazia ou é a opção I. Se sim inserimos no inicio*/
+    if(!tabela[idx]){
+        tabela[idx] = novo;
+        return;
+    }
+    /*caso 2, for do tipo I, insere no inicio*/
+    if(tipo == 'I'){
+        novo->prox = tabela[idx]; // O novo aponta para o antigo primeiro
+        tabela[idx] = novo;       // O novo vira o primeiro
+        return;
+    }else{ /*caso 3, tipo G insere no fim*/
+        NoIndice *aux = tabela[idx];
+        while(aux->prox)
+            aux = aux->prox;
+        aux->prox = novo;
+    }
 }
 
 void carregar_indice(char tipo, FILE *arqBlockchain){
     /*a função recebe ou tipo I OU tipo G e configura os ponteiros*/
+    if(tipo == 'G' && g_carregado) return;
+    if(tipo == 'I' && i_carregado) return;
     /* Ponteiros auxiliares para configurar o comportamento da função*/
     NoIndice **tabela;
     int tamanho;
@@ -246,8 +264,6 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
     /*baseada no tipo*/
     if(tipo == 'G')
     {
-        if(g_carregado)
-            return; /*já carregou*/
         tabela = tabela_endereco;
         tamanho = TAM_HASH_ADRESS;
         nome_arquivo = "indice_minerador.bin";
@@ -255,8 +271,6 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
     } 
     else 
     { 
-        if(i_carregado)
-            return;
         tabela = tabela_nonce;
         tamanho = TAM_HASH_NONCE;
         nome_arquivo = "indice_nonce.bin";
@@ -270,15 +284,18 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
         printf("Carregando indice %c do disco...\n", tipo);
         RegistroIndice reg;
         while(fread(&reg, sizeof(RegistroIndice), 1, arqIndice)){
-            insere_tabela(tabela, tamanho, reg.chave, reg.id_bloco);
+            insere_tabela(tabela, tamanho, reg.chave, reg.id_bloco, tipo);
         }
-        fclose(arqIndice);
+        fclose(arqIndice); 
     } 
     /*arquivo não existe, ler blockchain e criar*/
     else{
         printf("Criando indice %c a partir da blockchain...\n", tipo);
         arqIndice = fopen(nome_arquivo, "wb");
-        
+        if(!arqIndice){
+            printf("Erro ao criar arquivo de indice!\n");
+            return;
+        }
         blocoMin b;
         RegistroIndice reg;
         
@@ -287,7 +304,7 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
             /* decide ual campo extrair */
             unsigned int chave_atual = (tipo == 'G') ? b.bloco.data[183] : b.bloco.nonce;
             
-            insere_tabela(tabela, tamanho, chave_atual, b.bloco.numero);
+            insere_tabela(tabela, tamanho, chave_atual, b.bloco.numero, tipo);
 
             /*gravar no disco*/
             reg.chave = chave_atual;
@@ -297,9 +314,9 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
         fclose(arqIndice);
     }
 
-    *flag_carregado = 1; /*marca como pronto*/
+    *flag_carregado = 1; /*marca como carregado*/
     printf("Indice %c pronto para uso\n", tipo);
-}
+}   
 
 void carregar_carteira(FILE *arq){
 /*
@@ -554,3 +571,28 @@ void consulta_i(FILE *arq){
         printf("O nonce não foi encontrado. Apenas colisões.\n");
 }
 
+void liberar_memoria_indices(){
+    if(g_carregado){
+        for(int i = 0; i < TAM_HASH_MINER; i++){
+            NoIndice *atual = tabela_mineradores[i];
+            while(atual){
+                NoIndice *temp = atual;
+                atual = atual->prox;
+                free(temp);
+            }
+            tabela_mineradores[i] = NULL;
+        }
+    }
+
+    if(i_carregado){
+        for(int i = 0; i < TAM_HASH_NONCE; i++){
+            NoIndice *atual = tabela_nonces[i];
+            while(atual){
+                NoIndice *temp = atual;
+                atual = atual->prox;
+                free(temp);
+            }
+            tabela_nonces[i] = NULL;
+        }
+    }
+}
