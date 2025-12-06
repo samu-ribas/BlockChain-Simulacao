@@ -60,6 +60,7 @@ NoMinerador carteira_minerador[TAM_HASH_ADRESS] = {0}; /*Hash de Endereçamento 
 int g_carregado = 0;
 int i_carregado = 0;
 int ab_carregado = 0;
+int total_blocos_lidos = 0;
 
 /*funções auxiliares*/
 void imprimir_bloco_completo(blocoMin *b);
@@ -71,6 +72,7 @@ void carregar_carteira(FILE *arq);
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
 void opcao_A(FILE *arq);
 void opcao_B(FILE *arq);
+void media_bitcoins(FILE *arq);
 void buscar_bloco_f(FILE *arq);
 void consulta_g(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
@@ -116,7 +118,7 @@ int main()
 
             case 'e':
             case 'E':
-            
+                media_bitcoins(arqBin);
                 break;
 
             case 'f':
@@ -314,6 +316,7 @@ somente a primeira vez para carregar os dados do minerador para RAM
     rewind(arq);
     unsigned char minerador, orig, dest, val;
     while(fread(&b, sizeof(blocoMin), 1, arq)){
+        total_blocos_lidos++;
         /*processa os endereços para extrair o saldo e a quantidade minerada*/
         minerador = b.bloco.data[183];
         carteira_minerador[minerador].saldo += 50;
@@ -339,8 +342,9 @@ somente a primeira vez para carregar os dados do minerador para RAM
     printf("Dados carregados!\n");
 }
 
-/*função A*/
+/*função A, maior saldo BTC */
 void opcao_A(FILE *arq){
+    /*calcula o maior saldo, depois num laço for considera possivel empate*/
     carregar_carteira(arq);
     unsigned int maior_saldo = 0, i;
 
@@ -356,8 +360,9 @@ void opcao_A(FILE *arq){
     }
 }
 
-/*função B*/
+/*função B, quem mais minerou*/
 void opcao_B(FILE *arq){
+     /*calcula quem tem o maior numero de blocos minerados, depois num laço for considera possivel empate*/
     carregar_carteira(arq);
     unsigned int maior_mineracao = 0, i;
 
@@ -373,7 +378,26 @@ void opcao_B(FILE *arq){
     }  
 }
 
-/*função F*/
+/*função E, calcula média de bitcoins por bloco*/
+void media_bitcoins(FILE *arq){
+    carregar_carteira(arq);
+    if(total_blocos_lidos == 0){
+        printf("\nNenhum bloco encontrado.");
+        return;
+    }
+    unsigned long total_btc = 0;
+    for(int i = 0; i < 256; i++){
+        total_btc_circulacao += tabela_stats[i].saldo;
+    }
+    double media = (double)total_btc/total_blocos_lidos;
+    printf("\n=========== Quantidade Media de Bitcoins por Bloco ===========\n");
+    printf("Total em Circulacao: %lu BTC\n", total_btc_circulacao);
+    printf("Total de Blocos: %u\n", total_blocos_lidos);
+    printf("Media: %.2f BTC/bloco\n", media);
+    printf("================================================================\n");
+}
+
+/*função F, busca bloco, dado um n*/
 void buscar_bloco_f(FILE *arq){
     unsigned int num;
     /*buffer na ram*/
@@ -412,7 +436,7 @@ void buscar_bloco_f(FILE *arq){
         printf("Erro: Bloco %u não existe\n", num);
 }
 
-/*função G*/
+/*função G, busca n primeiros blocos de um endereço*/
 void consulta_g(FILE *arq){
 /*
     irá printar em ordem do bloco mais recente minerado pelo endereço 
@@ -462,7 +486,7 @@ void consulta_g(FILE *arq){
     }
 }
 
-/*função H*/
+/*função H, n primeiros ordenado por quant. de transações*/
 void imprimir_n_primeiro_ordenados(FILE *arq){
     unsigned int n, lidos = 0;
     printf("Digite a quantidade N de blocos para analisar: ");
@@ -498,7 +522,7 @@ void imprimir_n_primeiro_ordenados(FILE *arq){
     free(vetor);
 }
 
-/*função I*/
+/*função I, busca bloco dado um nonce*/
 void consulta_i(FILE *arq){
     unsigned int nonce_buscado;
     carregar_indice('I', arq);
