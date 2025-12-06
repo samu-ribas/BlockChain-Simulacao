@@ -60,11 +60,12 @@ int contar_transações(blocoMin *bloco);
 int transacoes_crescente(const void *a, const void *b);
 void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id);
 void carregar_indice(char tipo, FILE *arqBlockchain);
-void insere_tabela_nonce(unsigned int nonce, unsigned int id_bloco);
+
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
 void buscar_bloco_f(FILE *arq);
-void imprimir_n_primeiro_ordenados(FILE *arq);
 void consulta_g(FILE *arq);
+void imprimir_n_primeiro_ordenados(FILE *arq);
+void consulta_i(FILE *arq);
 
 /*main e menu*/
 int main()
@@ -126,7 +127,7 @@ int main()
 
             case 'i':
             case 'I':
-    
+                consulta_i(arqBin);
                 break;
 
             case 'x':
@@ -201,8 +202,8 @@ int contar_transações(blocoMin *b){
 }
 
 /*
-função comparadora para o quick sort
-retorna <0 se a<b, 0 se a=b , >0 se a>b
+    função comparadora para o quick sort
+    retorna <0 se a<b, 0 se a=b , >0 se a>b
 */
 int transacoes_crescente(const void *a, const void *b){
     BlocoOrdenavel *ba = (BlocoOrdenavel *)a;
@@ -210,6 +211,7 @@ int transacoes_crescente(const void *a, const void *b){
     return (ba->qtd - bb->qtd);
 }
 
+/*inserindo na hash como tratamento de colisao por encadeamento*/
 void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id){
     int idx = chave % tamanho_tabela;
     NoIndice *novo = NULL;
@@ -222,6 +224,9 @@ void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, un
     tabela[idx] = novo;
 }
 
+/*
+    a função recebe ou tipo I OU tipo G e configura os ponteiros
+*/
 void carregar_indice(char tipo, FILE *arqBlockchain){
     /* Ponteiros auxiliares para configurar o comportamento da função*/
     NoIndice **tabela;
@@ -244,7 +249,7 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
         if(i_carregado)
             return;
         tabela = tabela_nonce;
-        tamanho= TAM_HASH_NONCE;
+        tamanho = TAM_HASH_NONCE;
         nome_arquivo = "indice_nonce.bin";
         flag_carregado = &i_carregado;
     }
@@ -259,7 +264,6 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
             insere_tabela(tabela, tamanho, reg.chave, reg.id_bloco);
         }
         fclose(arqIndice);
-    
     } 
     /*arquivo não existe, ler blockchain e criar*/
     else{
@@ -286,17 +290,6 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
 
     *flag_carregado = 1; /*marca como pronto*/
     printf("Indice %c pronto para uso\n", tipo);
-}
-
-void insere_tabela_nonce(unsigned int nonce, unsigned int id_bloco){
-    int idx = nonce % TAM_HASH_NONCE;
-
-    NoIndice* novo = NULL;
-    novo = (NoIndice *)malloc(sizeof(NoIndice));
-    if(!novo)
-        return;
-    novo->chave = nonce;
-    novo->id_bloco = id_bloco;
 }
 
 /*função F*/
@@ -339,9 +332,9 @@ void buscar_bloco_f(FILE *arq){
 }
 
 /*
-função G
-irá printar em ordem do bloco mais recente minerado pelo endereço 
-pela maneria que foi inserido na lista encadeada(no inicio)
+    função G
+    irá printar em ordem do bloco mais recente minerado pelo endereço 
+    pela maneria que foi inserido na lista encadeada(no inicio)
 */
 void consulta_g(FILE *arq){
     /*parâmetro usados*/
@@ -423,3 +416,35 @@ void imprimir_n_primeiro_ordenados(FILE *arq){
     }
     free(vetor);
 }
+
+void consulta_i(FILE *arq){
+    unsigned int nonce_buscado;
+    carregar_indice('I', arq);
+    printf("Digite o nonce: ");
+    scanf("%u", &nonce_buscado);
+
+    int idx = nonce_buscado % TAM_HASH_NONCE;
+    NoIndice *atual = tabela_nonce[idx];
+    if(!atual){
+        printf("O nonce não foi encontrado.\n");
+        return;
+    }
+
+    printf("\n----------Blocos com Nonce %u----------\n", nonce_buscado);
+    blocoMin b;
+    int encontrou = 0;
+
+    while(atual){
+        /*verifica se é o nonce buscado*/
+        if(atual->chave == nonce_buscado){
+            fseek(arq, (long)(atual->id_bloco - 1) * sizeof(blocoMin), SEEK_SET);
+            fread(&b, sizeof(blocoMin), 1, arq);
+            imprimir_bloco_completo(&b);
+            encontrou = 1;
+        }
+        atual = atual->prox;
+    }
+    if(!encontrou)
+        printf("O nonce não foi encontrado. Apenas colisões.\n");
+}
+
