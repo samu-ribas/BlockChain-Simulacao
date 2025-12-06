@@ -100,7 +100,7 @@ int main()
 
             case 'b':
             case 'B':
-                
+                opcao_B(arqBin);
                 break;
 
             case 'c':
