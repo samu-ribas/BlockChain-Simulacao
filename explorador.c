@@ -34,6 +34,11 @@ typedef struct NoIndice{
     struct NoIndice *prox;
 }NoIndice;
 
+typedef struct Minerador{
+    unsigned int saldo = 0;
+    unsigned int qtd_minerados = 0;
+}NoMinerador;
+
 /* Registro genérico */
 typedef struct{
     unsigned char chave;
@@ -49,10 +54,11 @@ typedef struct{
 /*declarando globalmente as tabelas usadas*/
 NoIndice* tabela_endereco[TAM_HASH_ADRESS] = {NULL};
 NoIndice* tabela_nonce[TAM_HASH_NONCE] = {NULL}; 
-
+NoMinerador* carteira_minerador[TAM_HASH_ADRESS] = {0};
 /*flags de controle*/
 int g_carregado = 0;
 int i_carregado = 0;
+int ab_carregado = 0;
 
 /*funções auxiliares*/
 void imprimir_bloco_completo(blocoMin *b);
@@ -60,8 +66,10 @@ int contar_transações(blocoMin *bloco);
 int transacoes_crescente(const void *a, const void *b);
 void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id);
 void carregar_indice(char tipo, FILE *arqBlockchain);
-
+void carregar_carteira(FILE *arq);
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
+void opcao_A(FILE *arq);
+void opcao_B(FILE *arq);
 void buscar_bloco_f(FILE *arq);
 void consulta_g(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
@@ -87,7 +95,7 @@ int main()
         {
             case 'a':
             case 'A':
-                
+                opcao_A(arqBin);
                 break;
 
             case 'b':
@@ -183,8 +191,8 @@ void imprimir_bloco_completo(blocoMin *b){
     }
 }
 
-/*função auxiliar para contar transações*/
 int contar_transações(blocoMin *b){
+    /*função auxiliar para contar transações*/
     if(b->bloco.numero == 1)// bloco genêsis
         return 0;
 
@@ -201,18 +209,18 @@ int contar_transações(blocoMin *b){
     return contador;
 }
 
+int transacoes_crescente(const void *a, const void *b){
 /*
     função comparadora para o quick sort
     retorna <0 se a<b, 0 se a=b , >0 se a>b
 */
-int transacoes_crescente(const void *a, const void *b){
     BlocoOrdenavel *ba = (BlocoOrdenavel *)a;
     BlocoOrdenavel *bb = (BlocoOrdenavel *)b;
     return (ba->qtd - bb->qtd);
 }
 
-/*inserindo na hash como tratamento de colisao por encadeamento*/
 void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id){
+    /*inserindo na hash como tratamento de colisao por encadeamento*/
     int idx = chave % tamanho_tabela;
     NoIndice *novo = NULL;
     novo = (NoIndice *)malloc(sizeof(NoIndice));
@@ -224,10 +232,8 @@ void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, un
     tabela[idx] = novo;
 }
 
-/*
-    a função recebe ou tipo I OU tipo G e configura os ponteiros
-*/
 void carregar_indice(char tipo, FILE *arqBlockchain){
+    /*a função recebe ou tipo I OU tipo G e configura os ponteiros*/
     /* Ponteiros auxiliares para configurar o comportamento da função*/
     NoIndice **tabela;
     int tamanho;
@@ -292,6 +298,80 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
     printf("Indice %c pronto para uso\n", tipo);
 }
 
+void carregar_carteira(FILE *arq){
+/*
+essa função só faz o trabalho pesado se for necessário, ou seja
+somente a primeira vez para carregar os dados do minerador para RAM
+(saldo e quantidade minerada)
+*/
+    /*confere se ja carregou os dados se sim, retorna*/
+    if(ab_carregado)
+        return;
+    printf("\n[Carregando dados do disco para a RAM...]\n");
+    /*aloca e preenche tudo com zeros */
+    blocoMin b;
+    rewind(arq);
+    unsigned char minerador, orig, dest, val
+    while(fread(&b, sizeof(blocoMin), 1, arq)){
+        /*processa os endereços para extrair o saldo e a quantidade minerada*/
+        minerador = b.bloco.data[183];
+        carteira_minerador[minerador].saldo += 50;
+        carteira_minerador[minerador].qtd_minerados++;
+        /*processa transações para saber quem tem mais transações e quem tem menos*/
+        if(b.bloco.numero > 1){
+            /*campo data tem 183 bytes + 1 do minerador*/
+            for(int k = 0; k < 183; k += 3){
+                 orig = b.bloco.data[k];
+                 dest = b.bloco.data[k+1];
+                 val  = b.bloco.data[k+2];
+
+                if(orig == 0 && dest == 0 && val == 0)
+                    break;
+                /*atualiza o saldo dos endereços envolvidos*/
+                carteira_minerador[orig].saldo -= val;
+                carteira_minerador[dest].saldo += val;
+            }
+        }
+    }
+    /*muda flag para carregado*/
+    ab_carregado = 1;
+    printf("Dados carregados!\n");
+}
+
+/*função A*/
+void opcao_A(FILE *arq){
+    carregar_carteira(arq);
+    unsigned int maior_saldo = 0, i;
+
+    /*busca quem tem mais bitcoins, ou seja, maior valor*/
+    for(i=0 ; i<TAM_HASH_ADRESS ; i++){
+        if(carteira_minerador[i].saldo > maior_saldo)
+            maior_saldo = carteira_minerador[i].saldo;
+    }
+    printf("\n===========ENDEREÇO(S) COM MAIS BITCOINS (%u BTC)===========\n", maior_saldo);
+    for(i=0 ; i<TAM_HASH_ADRESS ; i++){
+        if(carteira_minerador[i].saldo == maior_saldo)
+            printf("-> Endereço: %d\n", i);
+    }
+}
+
+/*função B*/
+void opcao_B(FILE *arq){
+    carregar_carteira(arq);
+    unsigned int maior_mineracao = 0, i;
+
+    /*busca quem minerou mais blocos*/
+    for(i=0 ; i<TAM_HASH_ADRESS ; i++){
+        if(carteira_minerador[i].qtd_minerados > maior_mineracao)
+            maior_mineracao = carteira_minerador[i].qtd_minerados;
+    }
+    printf("\n===========ENDEREÇO(S) QUE MAIS MINERARAM BLOCOS (%u blocos)===========\n", maior_mineracao);
+    for(i=0 ; i<TAM_HASH_ADRESS ; i++){
+        if(carteira_minerador[i].qtd_minerados == maior_mineracao)
+            printf("-> Endereço: %d\n", i);
+    }  
+}
+
 /*função F*/
 void buscar_bloco_f(FILE *arq){
     unsigned int num;
@@ -331,12 +411,12 @@ void buscar_bloco_f(FILE *arq){
         printf("Erro: Bloco %u não existe\n", num);
 }
 
+/*função G*/
+void consulta_g(FILE *arq){
 /*
-    função G
     irá printar em ordem do bloco mais recente minerado pelo endereço 
     pela maneria que foi inserido na lista encadeada(no inicio)
 */
-void consulta_g(FILE *arq){
     /*parâmetro usados*/
     int minerador_input, n;
     
@@ -417,6 +497,7 @@ void imprimir_n_primeiro_ordenados(FILE *arq){
     free(vetor);
 }
 
+/*função I*/
 void consulta_i(FILE *arq){
     unsigned int nonce_buscado;
     carregar_indice('I', arq);
