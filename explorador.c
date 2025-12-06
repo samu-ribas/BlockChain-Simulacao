@@ -60,7 +60,7 @@ int contar_transações(blocoMin *bloco);
 int transacoes_crescente(const void *a, const void *b);
 void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id);
 void carregar_indice(char tipo, FILE *arqBlockchain);
-
+void insere_tabela_nonce(unsigned int nonce, unsigned int id_bloco);
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
 void buscar_bloco_f(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
@@ -286,6 +286,17 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
 
     *flag_carregado = 1; /*marca como pronto*/
     printf("Indice %c pronto para uso\n", tipo);
+}
+
+void insere_tabela_nonce(unsigned int nonce, unsigned int id_bloco){
+    int idx = nonce % TAM_HASH_NONCE;
+
+    NoIndice* novo = NULL;
+    novo = (NoIndice *)malloc(sizeof(NoIndice));
+    if(!novo)
+        return;
+    novo->chave = nonce;
+    novo->id_bloco = id_bloco;
 }
 
 /*função F*/
