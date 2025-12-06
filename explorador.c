@@ -387,11 +387,11 @@ void media_bitcoins(FILE *arq){
     }
     unsigned long total_btc = 0;
     for(int i = 0; i < 256; i++){
-        total_btc_circulacao += tabela_stats[i].saldo;
+        total_btc_circulacao += carteira_minerador[i].saldo;
     }
     double media = (double)total_btc/total_blocos_lidos;
     printf("\n=========== Quantidade Media de Bitcoins por Bloco ===========\n");
-    printf("Total em Circulacao: %lu BTC\n", total_btc_circulacao);
+    printf("Total em Circulacao: %lu BTC\n", total_btc);
     printf("Total de Blocos: %u\n", total_blocos_lidos);
     printf("Media: %.2f BTC/bloco\n", media);
     printf("================================================================\n");
