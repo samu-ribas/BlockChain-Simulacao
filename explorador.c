@@ -8,7 +8,7 @@
 #define BLOCK_SIZE (sizeof(struct blocoNaoMin))
 /*le 4 blocos de uma vez*/
 #define FATOR_BLOCO 4
-/*definindo proximos numeros primos para tratar colisão*/
+
 #define TAM_HASH_NONCE 4099 
 #define TAM_HASH_ADRESS 256
 
@@ -35,8 +35,8 @@ typedef struct NoIndice{
 }NoIndice;
 
 typedef struct Minerador{
-    unsigned int saldo = 0;
-    unsigned int qtd_minerados = 0;
+    unsigned int saldo;
+    unsigned int qtd_minerados;
 }NoMinerador;
 
 /* Registro genérico */
@@ -54,7 +54,8 @@ typedef struct{
 /*declarando globalmente as tabelas usadas*/
 NoIndice* tabela_endereco[TAM_HASH_ADRESS] = {NULL};
 NoIndice* tabela_nonce[TAM_HASH_NONCE] = {NULL}; 
-NoMinerador* carteira_minerador[TAM_HASH_ADRESS] = {0};
+NoMinerador carteira_minerador[TAM_HASH_ADRESS] = {0}; /*Hash de Endereçamento Direto (onde o índice 10 é o minerador 10)*/
+
 /*flags de controle*/
 int g_carregado = 0;
 int i_carregado = 0;
@@ -311,7 +312,7 @@ somente a primeira vez para carregar os dados do minerador para RAM
     /*aloca e preenche tudo com zeros */
     blocoMin b;
     rewind(arq);
-    unsigned char minerador, orig, dest, val
+    unsigned char minerador, orig, dest, val;
     while(fread(&b, sizeof(blocoMin), 1, arq)){
         /*processa os endereços para extrair o saldo e a quantidade minerada*/
         minerador = b.bloco.data[183];
