@@ -66,7 +66,7 @@ int total_blocos_lidos = 0;
 void imprimir_bloco_completo(blocoMin *b);
 int contar_transações(blocoMin *bloco);
 int transacoes_crescente(const void *a, const void *b);
-void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id);
+void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, unsigned int id, char tipo);
 void carregar_indice(char tipo, FILE *arqBlockchain);
 void carregar_carteira(FILE *arq);
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
@@ -573,26 +573,26 @@ void consulta_i(FILE *arq){
 
 void liberar_memoria_indices(){
     if(g_carregado){
-        for(int i = 0; i < TAM_HASH_MINER; i++){
-            NoIndice *atual = tabela_mineradores[i];
+        for(int i = 0; i < TAM_HASH_ADRESS; i++){
+            NoIndice *atual = tabela_endereco[i];
             while(atual){
                 NoIndice *temp = atual;
                 atual = atual->prox;
                 free(temp);
             }
-            tabela_mineradores[i] = NULL;
+            tabela_endereco[i] = NULL;
         }
     }
 
     if(i_carregado){
         for(int i = 0; i < TAM_HASH_NONCE; i++){
-            NoIndice *atual = tabela_nonces[i];
+            NoIndice *atual = tabela_nonce[i];
             while(atual){
                 NoIndice *temp = atual;
                 atual = atual->prox;
                 free(temp);
             }
-            tabela_nonces[i] = NULL;
+            tabela_nonce[i] = NULL;
         }
     }
 }
