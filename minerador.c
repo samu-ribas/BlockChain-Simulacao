@@ -42,12 +42,11 @@ int main()
 	blocoMin buffer[16];  // O vetor que segura 16 blocos minerados
     int pos_buffer = 0;   // Índice para saber em qual posição (0-15) 
 
- 
     FILE *arqBin = fopen("blockchain.bin", "wb");
     FILE *arqTxt = fopen("blockchain.txt", "w");
 
-    if (arqBin == NULL || arqTxt == NULL) {
-        printf("Erro ao abrir arquivos!\n");
+    if(!arqBin || !arqTxt){
+        perror("Erro ao abrir arquivos!\n");
         return 1;
     }
 
@@ -124,19 +123,19 @@ int main()
         pos_buffer++; // Avança para a próxima posição do buffer
 
         /*se encheu 16 blocos, escreve no disco*/
-        if (pos_buffer == 16) {
+        if(pos_buffer == 16){
             escrever_buffer_no_disco(buffer, 16, arqBin, arqTxt);
             pos_buffer = 0; // Reseta para começar a encher de novo
         }
 
 		/*atualiza hash anterior para o pŕoximo loop*/
 		memcpy(hashAnterior, hash, SHA256_DIGEST_LENGTH);
-
 	}
 
 	/* se sobrou algo no buffer que não completou 16, grava agora*/
-    if(pos_buffer > 0)
+    if(pos_buffer > 0){
         escrever_buffer_no_disco(buffer, pos_buffer, arqBin, arqTxt);
+    }
   
   	imprimir_carteira_final(carteira);
     fclose(arqBin);
