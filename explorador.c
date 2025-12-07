@@ -72,6 +72,7 @@ void carregar_carteira(FILE *arq);
 /*funções principais em ordem (a,b,c,d,e,f,g,h,i)*/
 void opcao_A(FILE *arq);
 void opcao_B(FILE *arq);
+void opçao_C_mais_transacoes(FILE *arq);
 void media_bitcoins(FILE *arq);
 void buscar_bloco_f(FILE *arq);
 void consulta_g(FILE *arq);
@@ -109,7 +110,7 @@ int main()
 
             case 'c':
             case 'C':
-                
+                opçao_C_mais_transacoes(arqBin);
                 break;
 
             case 'd':
@@ -170,7 +171,7 @@ void imprimir_bloco_completo(blocoMin *b){
         printf("%02x", b->bloco.hashAnterior[i]);
     printf("\n");
 
-    printf("Minerador: %u (Recebeu +50 BTC)\n", b->bloco.data[183]);
+    printf("Minerador: %u (Recebeu +50 BTC)\n", b->bloco.data[DATA_SIZE-1]);
 
     if (b->bloco.numero == 1)
         printf("Dados: %s\n", b->bloco.data);
@@ -179,7 +180,7 @@ void imprimir_bloco_completo(blocoMin *b){
 
         int tem_transacao = 0;
         unsigned char o, d, v; //origem, destino e valor
-        for(int k = 0; k < 183; k += 3) {
+        for(int k = 0; k < DATA_SIZE-1; k += 3) {
             o = b->bloco.data[k];
             d = b->bloco.data[k+1];
             v = b->bloco.data[k+2];
@@ -202,7 +203,7 @@ int contar_transações(blocoMin *b){
 
     int contador = 0;
     unsigned char o, d, v;
-    for(int k = 0 ; k<183 ; k += 3){
+    for(int k = 0 ; k<DATA_SIZE-1 ; k += 3){
         o = b->bloco.data[k];
         d = b->bloco.data[k+1];
         v = b->bloco.data[k+2];
@@ -302,7 +303,7 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
         rewind(arqBlockchain);
         while(fread(&b, sizeof(blocoMin), 1, arqBlockchain)){
             /* decide ual campo extrair */
-            unsigned int chave_atual = (tipo == 'G') ? b.bloco.data[183] : b.bloco.nonce;
+            unsigned int chave_atual = (tipo == 'G') ? b.bloco.data[DATA_SIZE-1] : b.bloco.nonce;
             
             insere_tabela(tabela, tamanho, chave_atual, b.bloco.numero, tipo);
 
@@ -335,13 +336,13 @@ somente a primeira vez para carregar os dados do minerador para RAM
     while(fread(&b, sizeof(blocoMin), 1, arq)){
         total_blocos_lidos++;
         /*processa os endereços para extrair o saldo e a quantidade minerada*/
-        minerador = b.bloco.data[183];
+        minerador = b.bloco.data[DATA_SIZE-1];
         carteira_minerador[minerador].saldo += 50;
         carteira_minerador[minerador].qtd_minerados++;
         /*processa transações para saber quem tem mais transações e quem tem menos*/
         if(b.bloco.numero > 1){
             /*campo data tem 183 bytes + 1 do minerador*/
-            for(int k = 0; k < 183; k += 3){
+            for(int k = 0; k < DATA_SIZE-1; k += 3){
                  orig = b.bloco.data[k];
                  dest = b.bloco.data[k+1];
                  val  = b.bloco.data[k+2];
@@ -394,6 +395,41 @@ void opcao_B(FILE *arq){
             printf("-> Endereço: %d\n", i);
     }  
 }
+
+void opçao_C_mais_transacoes(FILE *arq){
+    /*
+        busca o valor máximo de transações
+        depois busca e imprime os hashs dos blocos que 
+        tem esse numero de transações
+    */
+    blocoMin b;
+    unsigned int max = 0;
+    int qtd_atual, encontrou = 0;
+    /*descobrir o máximo*/
+    rewind(arq);
+    while(fread(&b, sizeof(blocoMin), 1, arq)){
+        qtd_atual = contar_transações(&b);
+        if(qtd_atual > max)
+            max = qtd_atual;
+    }
+    printf("\nRecorde de transações: %u\n", max);
+    printf("\n================== Blocos com mais transações ==================\n");
+    /*imprimir os hashs*/
+    rewind(arq);
+    while(fread(&b, sizeof(blocoMin), 1, arq)){
+        if(contar_transações(&b) == max){
+            printf("Bloco: %u", b.bloco.numero);
+            printf("\tHash: ");
+            for(int i=0 ; i<SHA256_DIGEST_LENGTH ; i++)
+                printf("%02x", b.hash[i]);
+            printf("\n--------------------------------------------------------------------------------------\n");
+            encontrou++;
+        }   
+    }
+    if(encontrou>1)
+        printf("Total de blocos empatados %d\n", encontrou);
+}
+
 
 /*função E, calcula média de bitcoins por bloco*/
 void media_bitcoins(FILE *arq){
