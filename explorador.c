@@ -1,3 +1,9 @@
+/*
+ *  Ferramenta para ler e análisar o arquivo binário da blockchain.
+ *  Dependências: OpenSSL
+ *  O código foi verificado pelo valgrind.
+ */
+
 #include<stdio.h>
 #include<string.h>
 #include<openssl/sha.h>
@@ -6,9 +12,10 @@
 /* 61 transações x 3 bytes(origem, destino, valor) + 1 byte do minerador*/
 #define DATA_SIZE 184
 #define BLOCK_SIZE (sizeof(struct blocoNaoMin))
-/*le 4 blocos de uma vez*/
+/*tamanho para ler 4 blocos de uma vez*/
 #define FATOR_BLOCO 4
 
+/*tamanho das tabelas*/
 #define TAM_HASH_NONCE 4099 
 #define TAM_HASH_ADRESS 256
 
@@ -27,19 +34,20 @@ typedef struct blocoMin
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 }blocoMin;
 
-/* nó da lista encadeada carrega em RAM*/
+/* nó da lista encadeada dos indices carregada em RAM*/
 typedef struct NoIndice{
     unsigned int chave; /*guarda o endereço ou o nonce*/
     unsigned int id_bloco;
     struct NoIndice *prox;
 }NoIndice;
 
+/*nó da carteira de cada endereço*/
 typedef struct Minerador{
     unsigned int saldo;
     unsigned int qtd_minerados;
 }NoMinerador;
 
-/* Registro genérico */
+/*Registro genérico*/
 typedef struct{
     unsigned char chave;
     unsigned int id_bloco;
@@ -153,27 +161,28 @@ int main()
             default:
                 printf("Opção inválida!\n");
         }
-    }while(opcao!='x');
+    }while(opcao!='x' || opcao!='X');
     fclose(arqBin);
     return 0;
 }
 
 void imprimir_bloco_completo(blocoMin *b){
+    /*imprime um bloco minerado inteiro*/
     printf("\n--------------------------------------------------------------------------------------\n");
     printf("BLOCO %u\n", b->bloco.numero);
     printf("Nonce: %u\n", b->bloco.nonce);
     
     printf("Hash: ");
-    for(int i=0; i<32; i++)
+    for(int i=0; i<SHA256_DIGEST_LENGTH; i++)
         printf("%02x", b->hash[i]);
     printf("\n");
 
     printf("Hash anterior: ");
-    for(int i=0; i<32; i++)
+    for(int i=0; i<SHA256_DIGEST_LENGTH; i++)
         printf("%02x", b->bloco.hashAnterior[i]);
     printf("\n");
 
-    printf("Minerador: %u (Recebeu +50 BTC)\n", b->bloco.data[DATA_SIZE-1]);
+    printf("Minerador: %u (Recebeu 50 BTC)\n", b->bloco.data[DATA_SIZE-1]);
 
     if (b->bloco.numero == 1)
         printf("Dados: %s\n", b->bloco.data);
@@ -194,13 +203,13 @@ void imprimir_bloco_completo(blocoMin *b){
             tem_transacao = 1;
         }
         if(!tem_transacao)
-            printf("Bloco vazio, sem transacoes\n");
+            printf("Bloco vazio, sem transações\n");
     }
 }
 
 int contar_transações(blocoMin *b){
     /*função auxiliar para contar transações*/
-    if(b->bloco.numero == 1)// bloco genêsis
+    if(b->bloco.numero == 1)/* bloco genêsis */
         return 0;
 
     int contador = 0;
@@ -218,9 +227,9 @@ int contar_transações(blocoMin *b){
 
 int transacoes_crescente(const void *a, const void *b){
 /*
-    função comparadora para o quick sort
-    retorna <0 se a<b, 0 se a=b , >0 se a>b
-*/
+ *  função comparadora para o quick sort
+ *  retorna <0 se a<b, 0 se a=b , >0 se a>b
+ */
     BlocoOrdenavel *ba = (BlocoOrdenavel *)a;
     BlocoOrdenavel *bb = (BlocoOrdenavel *)b;
     return (ba->qtd - bb->qtd);
@@ -236,15 +245,15 @@ void insere_tabela(NoIndice **tabela, int tamanho_tabela, unsigned int chave, un
     novo->chave = chave;
     novo->id_bloco = id;
     novo->prox = NULL;
-    /*caso 1 lista vazia ou é a opção I. Se sim inserimos no inicio*/
+    /*caso 1 lista vazia, se sim inserimos no inicio*/
     if(!tabela[idx]){
         tabela[idx] = novo;
         return;
     }
     /*caso 2, for do tipo I, insere no inicio*/
     if(tipo == 'I'){
-        novo->prox = tabela[idx]; // O novo aponta para o antigo primeiro
-        tabela[idx] = novo;       // O novo vira o primeiro
+        novo->prox = tabela[idx];
+        tabela[idx] = novo;       
         return;
     }else{ /*caso 3, tipo G insere no fim*/
         NoIndice *aux = tabela[idx];
@@ -258,6 +267,7 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
     /*a função recebe ou tipo I OU tipo G e configura os ponteiros*/
     if(tipo == 'G' && g_carregado) return;
     if(tipo == 'I' && i_carregado) return;
+
     /* Ponteiros auxiliares para configurar o comportamento da função*/
     NoIndice **tabela;
     int tamanho;
@@ -330,8 +340,7 @@ somente a primeira vez para carregar os dados do minerador para RAM
     /*confere se ja carregou os dados se sim, retorna*/
     if(ab_carregado)
         return;
-    printf("\n[Carregando dados do disco para a RAM...]\n");
-    /*aloca e preenche tudo com zeros */
+    printf("\nCarregando dados do disco para a RAM...\n");
     blocoMin b;
     rewind(arq);
     unsigned char minerador, orig, dest, val;

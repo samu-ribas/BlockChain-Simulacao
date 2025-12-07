@@ -1,3 +1,11 @@
+/*
+ *	Este programa simula o processo de mineração de blocos de um Blockchain
+ *	gerando transações aleatórias utilizando o algoritmo mtwister, calculando
+ *	o hash via OPENSSL, gravando a cadeia de blocos em formato binário.
+ * 	Dependência: OpenSSL e mtwister.c.
+ *	O código foi verificado pelo valgrind.
+ */
+
 #include<stdio.h>
 #include<string.h>
 #include<openssl/crypto.h>
@@ -39,8 +47,8 @@ int main()
 	unsigned int carteira[256] = {0};
 	MTRand r = seedRand(1234567);
 
-	blocoMin buffer[16];  // O vetor que segura 16 blocos minerados
-    int pos_buffer = 0;   // Índice para saber em qual posição (0-15) 
+	blocoMin buffer[16];  /* O vetor que segura 16 blocos minerados */
+    int pos_buffer = 0;   /* Índice para saber em qual posição esta na escrita para o arq (0-15) */ 
 
     FILE *arqBin = fopen("blockchain.bin", "wb");
     FILE *arqTxt = fopen("blockchain.txt", "w");
@@ -62,7 +70,7 @@ int main()
 	
 	/*escolhe o minerador aleatório e colocar na última posição*/
 	unsigned char minerador = (unsigned char)(genRandLong(&r) % 256);
-	bnm.data[183] = minerador;
+	bnm.data[DATA_SIZE-1] = minerador;
 
 	/*zerando hash anterior do genesis*/
 	for(int i = 0 ; i<SHA256_DIGEST_LENGTH ; i++)
@@ -100,11 +108,11 @@ int main()
             	bnm.nonce++;
 		}while(hash[0]!=0);
 
-		unsigned char minerador = bnm.data[183];
+		unsigned char minerador = bnm.data[DATA_SIZE-1];
 		carteira[minerador] += 50;
 
 		/*lê o vetor data até encontrar zeros ou atingir o limite, cada transação são 3 bytes*/
-		for(int k =0 ; k<183 ; k+=3){
+		for(int k =0 ; k<DATA_SIZE-1 ; k+=3){
 			orig = bnm.data[k];
 			dest = bnm.data[k+1];
 			val = bnm.data[k+2];
@@ -145,12 +153,12 @@ int main()
 }
 
 void gerar_transacao(blocoNaoMin *bnm, unsigned int *carteira, MTRand *r){
-	/*
-	Olhar quem tem dinheiro na carteira;
-	Escolher aleatoriamente quantas transações fazer (0 a 61);
-	Escolher valores e destinos;
-	Debitar da carteira imediatamente para evitar gastar o mesmo dinheiro duas vezes no mesmo bloco;
-	Preencher o vetor data.
+   /*
+	*	Olhar quem tem dinheiro na carteira;
+	*	Escolher aleatoriamente quantas transações fazer (0 a 61);
+	*	Escolher valores e destinos;
+	*	Debitar da carteira imediatamente para evitar gastar o mesmo dinheiro duas vezes no mesmo bloco;
+	*	Preencher o vetor data.
 	*/
 	int i;
 	unsigned int carteira_temp[256];
