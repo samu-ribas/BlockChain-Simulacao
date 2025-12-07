@@ -73,11 +73,13 @@ void carregar_carteira(FILE *arq);
 void opcao_A(FILE *arq);
 void opcao_B(FILE *arq);
 void opçao_C_mais_transacoes(FILE *arq);
+void opcao_D_menos_transacoes(FILE *arq);
 void media_bitcoins(FILE *arq);
 void buscar_bloco_f(FILE *arq);
 void consulta_g(FILE *arq);
 void imprimir_n_primeiro_ordenados(FILE *arq);
 void consulta_i(FILE *arq);
+
 void liberar_memoria_indices();
 
 /*main e menu*/
@@ -115,7 +117,7 @@ int main()
 
             case 'd':
             case 'D':
-                
+                opcao_D_menos_transacoes(arqBin);
                 break;
 
             case 'e':
@@ -418,6 +420,34 @@ void opçao_C_mais_transacoes(FILE *arq){
     rewind(arq);
     while(fread(&b, sizeof(blocoMin), 1, arq)){
         if(contar_transações(&b) == max){
+            printf("Bloco: %u", b.bloco.numero);
+            printf("\tHash: ");
+            for(int i=0 ; i<SHA256_DIGEST_LENGTH ; i++)
+                printf("%02x", b.hash[i]);
+            printf("\n--------------------------------------------------------------------------------------\n");
+            encontrou++;
+        }   
+    }
+    if(encontrou>1)
+        printf("Total de blocos empatados %d\n", encontrou);
+}
+
+void opcao_D_menos_transacoes(FILE *arq){
+    blocoMin b;
+    unsigned int min = 61;
+    int qtd_atual, encontrou = 0;
+    /*descobrir o máximo*/
+    rewind(arq);
+    while(fread(&b, sizeof(blocoMin), 1, arq)){
+        qtd_atual = contar_transações(&b);
+        if(qtd_atual < min)
+            min = qtd_atual;
+    }
+    printf("\n================== Blocos com menos transações (%u) ==================\n", min);
+    /*imprimir os hashs*/
+    rewind(arq);
+    while(fread(&b, sizeof(blocoMin), 1, arq)){
+        if(contar_transações(&b) == min){
             printf("Bloco: %u", b.bloco.numero);
             printf("\tHash: ");
             for(int i=0 ; i<SHA256_DIGEST_LENGTH ; i++)
