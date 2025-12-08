@@ -17,11 +17,3 @@ O objetivo é simular uma versão simplificada da blockchain do Bitcoin, incluin
 
 Para compilar e rodar o projeto, você precisará ter o compilador GCC e as bibliotecas OpenSSL instaladas.
 
-### Membros do Grupo 
-
-* **Integrantes:**
-    * MANUELA CELANO MENEZES DE ALMEIDA
-    * VICTOR NOVOLI MENDONCA
-    * LUCAS HIROTO NAGATA
-    * SAMUEL FRANCISCO RIBAS
-      
