@@ -154,15 +154,15 @@ int main()
                 break;
 
             case 'x':
-            case 'X':
                 printf("Saindo...\n");
                 break;
 
             default:
                 printf("Opção inválida!\n");
         }
-    }while(opcao!='x' || opcao!='X');
+    }while(opcao!='x');
     fclose(arqBin);
+    liberar_memoria_indices();
     return 0;
 }
 
@@ -311,7 +311,8 @@ void carregar_indice(char tipo, FILE *arqBlockchain){
         }
         blocoMin b;
         RegistroIndice reg;
-        
+        memset(&reg, 0, sizeof(RegistroIndice));
+
         rewind(arqBlockchain);
         while(fread(&b, sizeof(blocoMin), 1, arqBlockchain)){
             /* decide ual campo extrair */

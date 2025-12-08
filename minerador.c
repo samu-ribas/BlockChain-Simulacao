@@ -228,16 +228,16 @@ void escrever_buffer_no_disco(blocoMin *buffer, int qtd, FILE *arqBin, FILE *arq
         fprintf(arqTxt, "BLOCO %u (Nonce: %u)\n", buffer[i].bloco.numero, buffer[i].bloco.nonce);
         
         fprintf(arqTxt, "Hash: ");
-        for(int j=0; j<32; j++)
+        for(int j=0; j<SHA256_DIGEST_LENGTH; j++)
         	fprintf(arqTxt, "%02x", buffer[i].hash[j]);
         fprintf(arqTxt, "\n");
 
         fprintf(arqTxt, "Hash Ant: ");
-        for(int j=0; j<32; j++)
+        for(int j=0; j<SHA256_DIGEST_LENGTH; j++)
         	fprintf(arqTxt, "%02x", buffer[i].bloco.hashAnterior[j]);
         fprintf(arqTxt, "\n");
         
-        fprintf(arqTxt, "Minerador: %u\n", buffer[i].bloco.data[183]);
+        fprintf(arqTxt, "Minerador: %u\n", buffer[i].bloco.data[DATA_SIZE-1]);
 
         /*se for Gênesis, imprime string*/
         if(buffer[i].bloco.numero == 1)
@@ -245,7 +245,7 @@ void escrever_buffer_no_disco(blocoMin *buffer, int qtd, FILE *arqBin, FILE *arq
         else
         {
             fprintf(arqTxt, "Transacoes:\n");
-            for(int k=0; k<183; k+=3){
+            for(int k=0; k<DATA_SIZE-1; k+=3){
                 o = buffer[i].bloco.data[k];
                 d = buffer[i].bloco.data[k+1];
                 v = buffer[i].bloco.data[k+2];
